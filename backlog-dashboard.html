@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>백로그 대시보드 (읽기 전용)</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f7f7f8;
+    --panel: #ffffff;
+    --border: #d9dadd;
+    --text: #1c1e21;
+    --muted: #6b7076;
+    --accent: #2563eb;
+    --danger: #b3261e;
+    --danger-bg: #fdecea;
+    --warn-bg: #fff8e1;
+    --warn-text: #7a5b00;
+    --chip-bg: #eef1f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1c1f;
+      --panel: #232427;
+      --border: #3a3b3f;
+      --text: #e7e8ea;
+      --muted: #9a9da3;
+      --accent: #7aa2ff;
+      --danger: #ff8a80;
+      --danger-bg: #3a1f1d;
+      --warn-bg: #3a2f0f;
+      --warn-text: #f2cf6b;
+      --chip-bg: #2c2d31;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  #app { max-width: 1200px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 0 0 8px; }
+  header { margin-bottom: 16px; }
+  .sub { color: var(--muted); font-size: 12.5px; margin: 0 0 14px; }
+  .file-controls {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px;
+  }
+  button {
+    font: inherit; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--panel); color: var(--text); cursor: pointer;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .file-meta { color: var(--muted); font-size: 12.5px; }
+  .file-meta strong { color: var(--text); }
+  #notices { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+  .notice {
+    border-radius: 8px; padding: 10px 12px; font-size: 13px; border: 1px solid var(--border);
+    white-space: pre-wrap;
+  }
+  .notice.error { background: var(--danger-bg); color: var(--danger); border-color: var(--danger); }
+  .notice.warn { background: var(--warn-bg); color: var(--warn-text); border-color: var(--warn-text); }
+  .notice.info { background: var(--chip-bg); color: var(--text); }
+  #summary {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;
+    margin-bottom: 16px;
+  }
+  .stat-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
+  }
+  .stat-card .num { font-size: 22px; font-weight: 700; }
+  .stat-card .label { color: var(--muted); font-size: 12px; }
+  .status-breakdown { grid-column: 1 / -1; }
+  .status-breakdown ul { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  .status-breakdown li { background: var(--chip-bg); border-radius: 999px; padding: 4px 10px; font-size: 12.5px; }
+  main#mainArea { display: flex; gap: 16px; align-items: flex-start; }
+  #listPane { flex: 1 1 55%; min-width: 0; }
+  #detailPane {
+    flex: 1 1 45%; min-width: 280px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px; position: sticky; top: 16px; max-height: calc(100vh - 32px);
+    overflow-y: auto;
+  }
+  @media (max-width: 800px) {
+    main#mainArea { flex-direction: column; }
+    #detailPane { position: static; max-height: none; width: 100%; }
+  }
+  .controls { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; align-items: center; }
+  .controls select, .controls input[type="search"] {
+    font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--panel); color: var(--text);
+  }
+  .controls input[type="search"] { flex: 1 1 220px; }
+  #resultCount { color: var(--muted); font-size: 12.5px; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  thead th {
+    text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em;
+    color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--border);
+  }
+  tbody td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; font-size: 13px; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--chip-bg); }
+  tbody tr.selected { background: var(--chip-bg); outline: 2px solid var(--accent); outline-offset: -2px; }
+  tbody tr:last-child td { border-bottom: none; }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 999px; background: var(--chip-bg); font-size: 11.5px; }
+  .badge.unknown { background: var(--warn-bg); color: var(--warn-text); }
+  .badge.ref-error { background: var(--danger-bg); color: var(--danger); }
+  .placeholder { color: var(--muted); }
+  dl.detail { margin: 0; }
+  dl.detail dt { font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); margin-top: 14px; }
+  dl.detail dt:first-child { margin-top: 0; }
+  dl.detail dd { margin: 3px 0 0; white-space: pre-wrap; word-break: break-word; }
+  .muted-value { color: var(--muted); font-style: italic; }
+  .chip-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+  .chip-list li { background: var(--chip-bg); border-radius: 6px; padding: 2px 8px; font-size: 12.5px; }
+  .chip-list li.broken { background: var(--danger-bg); color: var(--danger); }
+  .log-list { margin: 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .log-list li { background: var(--chip-bg); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; }
+  .log-list .log-when { color: var(--muted); }
+  .gate-box, .evidence-box {
+    background: var(--chip-bg); border-radius: 8px; padding: 8px 10px; font-family: ui-monospace, Consolas, monospace;
+    font-size: 12.5px; white-space: pre-wrap; word-break: break-word;
+  }
+  .hint { color: var(--muted); font-size: 11.5px; margin-top: 4px; }
+  .detail-header { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .detail-header .id { font-weight: 700; font-size: 16px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>백로그 대시보드</h1>
+    <p class="sub">읽기 전용 뷰어입니다. 선택한 JSON 파일을 수정하거나 외부로 전송하지 않습니다.</p>
+    <div class="file-controls">
+      <button id="btnPick" class="primary" type="button">파일 선택…</button>
+      <button id="btnReload" type="button" disabled>다시 읽기</button>
+      <button id="btnDocDir" type="button">상세 문서 폴더 연결 (선택사항)</button>
+      <input type="file" id="fileInput" accept="application/json,.json" hidden>
+      <input type="file" id="docFileInput" accept=".md,text/markdown" hidden>
+      <span id="fileMeta" class="file-meta">불러온 파일이 없습니다. "파일 선택"으로 백로그 JSON을 열어주세요.</span>
+    </div>
+    <p id="docDirStatus" class="hint">작업을 클릭하면 detail_doc 경로(없으면 docs/backlog/&lt;id&gt;.md로 추정)의 문서를 자동으로 보여주려 시도합니다: 먼저 같은 위치에서 조용히 fetch를 시도하고(로컬 서버로 열었을 때만 성공), 안 되면 폴더 접근 권한을 한 번 묻는 대화상자가 뜹니다 — 승인하면 그 뒤로는 클릭만으로 자동 표시됩니다. 상위 폴더 이동(..)이나 절대경로가 담긴 경로는 자동으로 열지 않고 직접 선택하도록 남겨둡니다. 이 브라우저가 폴더 연결을 지원하지 않으면(Firefox 등) 작업마다 "문서 파일 선택" 버튼으로 직접 열어야 합니다. 어떤 경우에도 파일 내용을 외부로 전송하지 않습니다.</p>
+  </header>
+
+  <section id="notices"></section>
+
+  <section id="summary" hidden></section>
+
+  <main id="mainArea" hidden>
+    <section id="listPane">
+      <div class="controls">
+        <select id="statusFilter"></select>
+        <input type="search" id="searchBox" placeholder="ID · 제목 · 설명(summary) 검색">
+        <span id="resultCount"></span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th><th>상태</th><th>분류</th><th>우선순위</th><th>담당자</th><th>제목</th>
+          </tr>
+        </thead>
+        <tbody id="taskTbody"></tbody>
+      </table>
+    </section>
+    <section id="detailPane">
+      <p class="placeholder">왼쪽 목록에서 작업을 선택하면 상세 정보가 여기 표시됩니다.</p>
+    </section>
+  </main>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- tiny safe-DOM helper (never uses innerHTML with data) ----
+  function h(tag, attrs, children) {
+    const el = document.createElement(tag);
+    if (attrs) {
+      for (const k in attrs) {
+        if (k === "class") el.className = attrs[k];
+        else if (k.startsWith("on") && typeof attrs[k] === "function") el.addEventListener(k.slice(2), attrs[k]);
+        else el.setAttribute(k, attrs[k]);
+      }
+    }
+    (children || []).forEach((c) => {
+      if (c === null || c === undefined) return;
+      el.appendChild(typeof c === "string" || typeof c === "number" ? document.createTextNode(String(c)) : c);
+    });
+    return el;
+  }
+  function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+  function text(s) { return document.createTextNode(s); }
+
+  // ---- state ----
+  const state = {
+    fileName: null,
+    fileSize: null,
+    fileLastModified: null,
+    loadedAt: null,
+    handle: null,          // FileSystemFileHandle, when supported
+    rawText: null,
+    data: null,
+    tasks: [],
+    idSet: new Set(),
+    enums: {},
+    meta: {},
+    refErrors: [],         // { taskId, field, ref }
+    duplicateIds: [],
+    unknownStatusTasks: [],
+    filterStatus: "__all__",
+    searchText: "",
+    selectedIndex: -1,
+    docDirHandle: null,     // FileSystemDirectoryHandle for docs/backlog, only set once the user grants folder access
+    docDirDeclined: false,  // true once the user has cancelled the folder-access prompt this session, so clicks stop re-asking
+    docCache: new Map(),    // task id -> { status: "loaded"|"not_found"|"blocked"|"unavailable", content?, message? } for detail_doc
+    docFieldCache: new Map(), // task id -> { status: "loaded", content } for a manually picked file matching the task's own "doc" field
+    pendingDocTarget: null, // { kind: "backlogDoc"|"docField", id } the manual file picker result belongs to
+  };
+
+  const supportsFsAccess = typeof window.showOpenFilePicker === "function";
+  const supportsDirPicker = typeof window.showDirectoryPicker === "function";
+
+  const els = {
+    btnPick: document.getElementById("btnPick"),
+    btnReload: document.getElementById("btnReload"),
+    btnDocDir: document.getElementById("btnDocDir"),
+    fileInput: document.getElementById("fileInput"),
+    docFileInput: document.getElementById("docFileInput"),
+    docDirStatus: document.getElementById("docDirStatus"),
+    fileMeta: document.getElementById("fileMeta"),
+    notices: document.getElementById("notices"),
+    summary: document.getElementById("summary"),
+    mainArea: document.getElementById("mainArea"),
+    statusFilter: document.getElementById("statusFilter"),
+    searchBox: document.getElementById("searchBox"),
+    resultCount: document.getElementById("resultCount"),
+    taskTbody: document.getElementById("taskTbody"),
+    detailPane: document.getElementById("detailPane"),
+  };
+
+  els.btnReload.textContent = supportsFsAccess ? "다시 읽기 (새로고침)" : "파일 다시 선택";
+  if (!supportsDirPicker) {
+    els.btnDocDir.disabled = true;
+    els.docDirStatus.textContent = "이 브라우저는 폴더 자동 연결을 지원하지 않습니다 — 로컬 서버로 열었다면 클릭만으로 자동 표시될 수 있고, 그렇지 않다면 작업 상세보기의 \"문서 파일 선택\" 버튼으로 직접 열어야 합니다.";
+  }
+
+  // Grants (or reuses) access to a local folder for auto-loading detail_doc
+  // files. force=true (the explicit button) always re-prompts, even if a
+  // folder is already connected or was previously declined; force=false (the
+  // automatic first-click path) skips prompting again once the user has
+  // already said no once this session, so a click never nags repeatedly.
+  async function ensureDirHandle(opts) {
+    const force = !!(opts && opts.force);
+    if (state.docDirHandle && !force) return state.docDirHandle;
+    if (!supportsDirPicker) return null;
+    if (state.docDirDeclined && !force) return null;
+    try {
+      const handle = await window.showDirectoryPicker();
+      state.docDirHandle = handle;
+      state.docDirDeclined = false;
+      state.docCache.clear();
+      els.docDirStatus.textContent = "연결된 폴더: \"" + handle.name + "\" — 이후로는 작업을 클릭하면 이 폴더에서 문서를 자동으로 찾아 보여줍니다.";
+      return handle;
+    } catch (err) {
+      if (err && err.name === "AbortError") {
+        state.docDirDeclined = true;
+        els.docDirStatus.textContent = force
+          ? "폴더 연결이 취소되었습니다."
+          : "폴더 연결을 건너뛰었습니다 — 다음부터는 다시 묻지 않고 작업 상세보기의 \"문서 파일 선택\" 버튼으로 직접 열 수 있습니다. 자동 표시를 다시 켜려면 \"상세 문서 폴더 연결\" 버튼을 눌러주세요.";
+        return null;
+      }
+      els.docDirStatus.textContent = "폴더 연결 중 오류: " + err.message;
+      return null;
+    }
+  }
+
+  els.btnDocDir.addEventListener("click", async () => {
+    const handle = await ensureDirHandle({ force: true });
+    if (handle && state.selectedIndex >= 0) renderDetail(state.tasks[state.selectedIndex]);
+  });
+
+  els.docFileInput.addEventListener("change", async (e) => {
+    const file = e.target.files && e.target.files[0];
+    const target = state.pendingDocTarget;
+    if (file && target) {
+      const content = await file.text();
+      const cache = target.kind === "docField" ? state.docFieldCache : state.docCache;
+      cache.set(target.id, { status: "loaded", content });
+      if (state.selectedIndex >= 0 && state.tasks[state.selectedIndex] && state.tasks[state.selectedIndex].id === target.id) {
+        renderDetail(state.tasks[state.selectedIndex]);
+      }
+    }
+    els.docFileInput.value = "";
+  });
+
+  // Resolves relPath (e.g. "docs/backlog/T1.md") under a connected folder
+  // handle. Tries the full relative path first (works if the user connected
+  // the repo root), then falls back to just the last path segment at the
+  // top of the connected folder (works if they connected docs/backlog
+  // directly) -- so either connection level finds the file.
+  async function resolveFileHandle(dirHandle, relPath) {
+    const segments = String(relPath).split(/[\\/]/).filter(Boolean);
+    try {
+      let cur = dirHandle;
+      for (let i = 0; i < segments.length - 1; i++) {
+        cur = await cur.getDirectoryHandle(segments[i]);
+      }
+      return await cur.getFileHandle(segments[segments.length - 1]);
+    } catch (err) {
+      return await dirHandle.getFileHandle(segments[segments.length - 1]);
+    }
+  }
+
+  // Rejects anything that could escape the intended docs tree: absolute
+  // paths, drive letters, URL schemes, or ".." segments. A backlog.json is
+  // Hook-guarded in this repo, but detail_doc is still just a text field --
+  // this is auto-loaded now (no per-click manual confirmation), so a
+  // malformed/hostile path must fail closed into the manual picker instead
+  // of being handed to fetch()/the file-system API.
+  function sanitizeRelPath(raw) {
+    const p = String(raw == null ? "" : raw);
+    if (!p) return null;
+    if (p.includes("://") || /^[a-zA-Z]:/.test(p) || p.startsWith("/") || p.startsWith("\\")) return null;
+    const segments = p.split(/[\\/]/);
+    if (segments.some((s) => s === "..")) return null;
+    return p;
+  }
+
+  // Same-origin fetch of the doc, for when this page is served over
+  // http(s) (e.g. `npx serve`, `python -m http.server`) rather than opened
+  // as a local file. Browsers refuse fetch() against file:// URLs outright,
+  // so that case is skipped up front instead of waiting on a doomed request
+  // (which would also risk losing the click's user-activation window before
+  // the directory-picker fallback below gets to use it).
+  async function fetchDocFromServer(safePath) {
+    if (location.protocol === "file:") return null;
+    try {
+      const res = await fetch(new URL(safePath, document.baseURI), { cache: "no-store" });
+      if (!res.ok) return null;
+      return await res.text();
+    } catch (err) {
+      return null;
+    }
+  }
+
+  // Tries, in order: (1) same-origin fetch, (2) the already-connected
+  // folder, (3) prompting once for folder access (a real browser permission
+  // dialog -- this never reads anything without that explicit grant, it
+  // just no longer requires a separate button press before the first
+  // task click). Always resolves to a cache entry (never null) so callers
+  // can render a definitive state instead of re-attempting on every render.
+  async function ensureDocForTask(id, docPath) {
+    if (state.docCache.has(id)) return state.docCache.get(id);
+
+    const safePath = sanitizeRelPath(docPath);
+    if (!safePath) {
+      const entry = {
+        status: "blocked",
+        message: "\"" + docPath + "\" 경로는 상위 폴더 이동(..)이나 절대경로를 포함해 자동으로 열지 않습니다. 필요하면 파일을 직접 선택해 주세요.",
+      };
+      state.docCache.set(id, entry);
+      return entry;
+    }
+
+    const fetched = await fetchDocFromServer(safePath);
+    if (fetched !== null) {
+      const entry = { status: "loaded", content: fetched };
+      state.docCache.set(id, entry);
+      return entry;
+    }
+
+    const dirHandle = await ensureDirHandle();
+    if (!dirHandle) {
+      const entry = {
+        status: "unavailable",
+        message: supportsDirPicker
+          ? "자동으로 불러오지 못했습니다. 아래에서 파일을 직접 선택하거나 \"상세 문서 폴더 연결\" 버튼을 다시 눌러주세요."
+          : "이 브라우저는 폴더 자동 연결을 지원하지 않습니다. 아래에서 문서 파일을 직접 선택해 주세요.",
+      };
+      state.docCache.set(id, entry);
+      return entry;
+    }
+
+    try {
+      const fh = await resolveFileHandle(dirHandle, safePath);
+      const file = await fh.getFile();
+      const content = await file.text();
+      const entry = { status: "loaded", content };
+      state.docCache.set(id, entry);
+      return entry;
+    } catch (err) {
+      const entry = {
+        status: "not_found",
+        message: "연결된 폴더에서 \"" + safePath + "\" 파일을 찾지 못했습니다. 저장소 루트 또는 docs/backlog 폴더를 연결했는지 확인해 주세요.",
+      };
+      state.docCache.set(id, entry);
+      return entry;
+    }
+  }
+
+  // Prefer the backlog data's own "detail_doc" path (added via
+  // `backlog-cli.mjs set-field <id> detail_doc --value docs/backlog/<id>.md`);
+  // fall back to the docs/backlog/<id>.md convention for files that predate it.
+  function detailDocPath(t) {
+    if (Object.prototype.hasOwnProperty.call(t, "detail_doc") && t.detail_doc) return String(t.detail_doc);
+    return "docs/backlog/" + String(t.id) + ".md";
+  }
+
+  // ---- file loading ----
+  async function pickFile() {
+    if (supportsFsAccess) {
+      try {
+        const [handle] = await window.showOpenFilePicker({
+          types: [{ description: "JSON", accept: { "application/json": [".json"] } }],
+        });
+        state.handle = handle;
+        const file = await handle.getFile();
+        await loadFile(file);
+      } catch (err) {
+        if (err && err.name === "AbortError") return; // user cancelled
+        renderFatalError("파일 선택 중 오류가 발생했습니다: " + err.message);
+      }
+    } else {
+      els.fileInput.value = ""; // allow re-selecting the same file
+      els.fileInput.click();
+    }
+  }
+
+  async function reloadFile() {
+    if (state.handle) {
+      try {
+        const file = await state.handle.getFile();
+        await loadFile(file);
+      } catch (err) {
+        renderFatalError("파일을 다시 읽는 중 오류가 발생했습니다: " + err.message);
+      }
+    } else {
+      pickFile();
+    }
+  }
+
+  els.fileInput.addEventListener("change", async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) {
+      state.handle = null;
+      await loadFile(file);
+    }
+  });
+
+  els.btnPick.addEventListener("click", pickFile);
+  els.btnReload.addEventListener("click", reloadFile);
+
+  function loadFile(file) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        state.fileName = file.name;
+        state.fileSize = file.size;
+        state.fileLastModified = file.lastModified;
+        state.loadedAt = new Date();
+        state.rawText = String(reader.result);
+        state.selectedIndex = -1;
+        els.btnReload.disabled = false;
+        parseAndRender();
+        resolve();
+      };
+      reader.onerror = () => {
+        renderFatalError("파일을 읽을 수 없습니다: " + (reader.error ? reader.error.message : "알 수 없는 오류"));
+        resolve();
+      };
+      reader.readAsText(file, "utf-8");
+    });
+  }
+
+  // ---- parsing & validation ----
+  function parseAndRender() {
+    updateFileMeta();
+
+    let data;
+    try {
+      data = JSON.parse(state.rawText);
+    } catch (err) {
+      renderFatalError(
+        "JSON 파싱 오류: 이 파일은 올바른 JSON 형식이 아닙니다.\n세부 내용: " + err.message
+      );
+      return;
+    }
+
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      renderFatalError("최상위 구조가 객체(object)가 아닙니다. 백로그 JSON은 { \"tasks\": [...] } 형태여야 합니다.");
+      return;
+    }
+    if (!Array.isArray(data.tasks)) {
+      renderFatalError("\"tasks\" 배열을 찾을 수 없습니다. 최상위에 tasks 배열이 있는 JSON을 선택해 주세요.");
+      return;
+    }
+
+    state.data = data;
+    state.tasks = data.tasks;
+    state.enums = (data.enums && typeof data.enums === "object") ? data.enums : {};
+    state.meta = (data.meta && typeof data.meta === "object") ? data.meta : {};
+
+    // id index + duplicate detection (ids are used exactly as-typed, never coerced to Number)
+    const idSet = new Set();
+    const seen = new Set();
+    const dupes = [];
+    for (const t of state.tasks) {
+      if (t && Object.prototype.hasOwnProperty.call(t, "id")) {
+        if (seen.has(t.id)) dupes.push(t.id);
+        seen.add(t.id);
+        idSet.add(t.id);
+      }
+    }
+    state.idSet = idSet;
+    state.duplicateIds = dupes;
+
+    // reference validation: unknown parent / deps are reported, never silently dropped
+    const refErrors = [];
+    for (const t of state.tasks) {
+      if (!t || !Object.prototype.hasOwnProperty.call(t, "id")) continue;
+      if (Object.prototype.hasOwnProperty.call(t, "parent") && t.parent !== null && t.parent !== undefined) {
+        if (!idSet.has(t.parent)) refErrors.push({ taskId: t.id, field: "parent", ref: t.parent });
+      }
+      if (Array.isArray(t.deps)) {
+        for (const d of t.deps) {
+          if (!idSet.has(d)) refErrors.push({ taskId: t.id, field: "deps", ref: d });
+        }
+      }
+    }
+    state.refErrors = refErrors;
+
+    // unknown status detection (only meaningful when enums.status is provided)
+    const knownStatuses = Array.isArray(state.enums.status) ? state.enums.status : null;
+    state.unknownStatusTasks = knownStatuses
+      ? state.tasks.filter((t) => t && !knownStatuses.includes(t.status)).map((t) => ({ id: t.id, status: t.status }))
+      : [];
+
+    state.filterStatus = "__all__";
+    state.searchText = "";
+    els.searchBox.value = "";
+    state.selectedIndex = -1;
+
+    renderNotices();
+    renderSummary();
+    buildStatusFilterOptions();
+    renderTable();
+    renderDetail(null);
+
+    els.mainArea.hidden = false;
+    els.summary.hidden = false;
+  }
+
+  function updateFileMeta() {
+    const mtime = state.fileLastModified ? new Date(state.fileLastModified) : null;
+    clear(els.fileMeta);
+    els.fileMeta.appendChild(h("strong", null, [state.fileName || "(파일명 없음)"]));
+    els.fileMeta.appendChild(text(
+      "  ·  크기 " + formatBytes(state.fileSize) +
+      "  ·  파일 최종 수정: " + (mtime ? mtime.toLocaleString() : "정보 없음") +
+      "  ·  대시보드에 불러온 시각: " + (state.loadedAt ? state.loadedAt.toLocaleString() : "-")
+    ));
+  }
+
+  function formatBytes(n) {
+    if (typeof n !== "number") return "정보 없음";
+    if (n < 1024) return n + " B";
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+    return (n / 1024 / 1024).toFixed(2) + " MB";
+  }
+
+  function renderFatalError(message) {
+    clear(els.notices);
+    els.notices.appendChild(h("div", { class: "notice error" }, [message]));
+    els.summary.hidden = true;
+    els.mainArea.hidden = true;
+    clear(els.summary);
+  }
+
+  function renderNotices() {
+    clear(els.notices);
+    const notices = [];
+
+    if (state.tasks.length === 0) {
+      notices.push({ type: "info", msg: "이 백로그에는 항목이 없습니다 (tasks 배열이 비어 있음). 파일 자체는 정상적으로 읽혔습니다." });
+    }
+    if (state.duplicateIds.length > 0) {
+      notices.push({ type: "warn", msg: "중복된 id가 있습니다: " + [...new Set(state.duplicateIds)].join(", ") });
+    }
+    if (state.unknownStatusTasks.length > 0) {
+      notices.push({
+        type: "warn",
+        msg: "enums.status에 없는 상태를 가진 작업이 " + state.unknownStatusTasks.length + "개 있습니다: " +
+          state.unknownStatusTasks.map((t) => t.id + "(" + t.status + ")").join(", "),
+      });
+    }
+    if (state.refErrors.length > 0) {
+      notices.push({
+        type: "error",
+        msg: "존재하지 않는 id를 참조하는 deps/parent가 " + state.refErrors.length + "건 있습니다 (조용히 무시하지 않고 표시합니다):\n" +
+          state.refErrors.map((e) => "  - " + e.taskId + "." + e.field + " → '" + e.ref + "' (없는 id)").join("\n"),
+      });
+    }
+    if (!Array.isArray(state.enums.status)) {
+      notices.push({ type: "info", msg: "이 JSON에는 enums.status가 없어 '알 수 없는 상태' 판정을 할 수 없습니다. 발견된 상태값만 필터에 표시합니다." });
+    }
+
+    for (const n of notices) {
+      els.notices.appendChild(h("div", { class: "notice " + n.type }, [n.msg]));
+    }
+  }
+
+  function renderSummary() {
+    clear(els.summary);
+    const tasks = state.tasks;
+    const total = tasks.length;
+    const parentIds = new Set(tasks.filter((t) => t && t.parent !== null && t.parent !== undefined).map((t) => t.parent));
+    const leafCount = tasks.filter((t) => t && !parentIds.has(t.id)).length;
+    const groupCount = total - leafCount;
+
+    const statusCounts = new Map();
+    for (const t of tasks) {
+      const s = t && Object.prototype.hasOwnProperty.call(t, "status") ? t.status : "(status 없음)";
+      statusCounts.set(s, (statusCounts.get(s) || 0) + 1);
+    }
+
+    els.summary.appendChild(h("div", { class: "stat-card" }, [
+      h("div", { class: "num" }, [String(total)]),
+      h("div", { class: "label" }, ["전체 항목 수 (parent + 하위 작업 모두 포함)"]),
+    ]));
+    els.summary.appendChild(h("div", { class: "stat-card" }, [
+      h("div", { class: "num" }, [String(leafCount)]),
+      h("div", { class: "label" }, ["실제 세부 실행 작업 수 (다른 작업의 parent로 쓰이지 않는 leaf 항목)"]),
+    ]));
+    els.summary.appendChild(h("div", { class: "stat-card" }, [
+      h("div", { class: "num" }, [String(groupCount)]),
+      h("div", { class: "label" }, ["상위(그룹) 작업 수 (다른 항목의 parent로 참조됨)"]),
+    ]));
+
+    const breakdown = h("div", { class: "stat-card status-breakdown" }, [
+      h("div", { class: "label" }, ["상태별 수"]),
+    ]);
+    const ul = h("ul", { class: "chip-list" }, []);
+    for (const [status, count] of statusCounts) {
+      ul.appendChild(h("li", null, [status + ": " + count]));
+    }
+    breakdown.appendChild(ul);
+    els.summary.appendChild(breakdown);
+  }
+
+  function buildStatusFilterOptions() {
+    clear(els.statusFilter);
+    const known = Array.isArray(state.enums.status) ? state.enums.status : [];
+    const observed = new Set(state.tasks.map((t) => t && t.status).filter((s) => s !== undefined));
+    const all = new Set([...known, ...observed]);
+
+    els.statusFilter.appendChild(h("option", { value: "__all__" }, ["전체 상태"]));
+    for (const s of all) {
+      const label = known.length && !known.includes(s) ? s + " (알 수 없음)" : String(s);
+      els.statusFilter.appendChild(h("option", { value: String(s) }, [label]));
+    }
+    els.statusFilter.value = "__all__";
+  }
+
+  els.statusFilter.addEventListener("change", () => {
+    state.filterStatus = els.statusFilter.value;
+    renderTable();
+  });
+  els.searchBox.addEventListener("input", () => {
+    state.searchText = els.searchBox.value.trim().toLowerCase();
+    renderTable();
+  });
+
+  function getFilteredTasks() {
+    return state.tasks.filter((t) => {
+      if (!t) return false;
+      if (state.filterStatus !== "__all__" && String(t.status) !== state.filterStatus) return false;
+      if (state.searchText) {
+        const haystack = (String(t.id ?? "") + " " + String(t.title ?? "") + " " + String(t.summary ?? "")).toLowerCase();
+        if (!haystack.includes(state.searchText)) return false;
+      }
+      return true;
+    });
+  }
+
+  function taskHasRefError(t) {
+    return state.refErrors.some((e) => e.taskId === t.id);
+  }
+  function statusIsUnknown(t) {
+    return Array.isArray(state.enums.status) && !state.enums.status.includes(t.status);
+  }
+
+  function renderTable() {
+    const filtered = getFilteredTasks();
+    clear(els.taskTbody);
+
+    if (filtered.length === 0) {
+      const tr = h("tr", null, [h("td", { colspan: "6", class: "placeholder" }, [
+        state.tasks.length === 0 ? "표시할 작업이 없습니다 (tasks가 비어 있음)." : "필터/검색 조건에 맞는 작업이 없습니다.",
+      ])]);
+      els.taskTbody.appendChild(tr);
+    } else {
+      filtered.forEach((t, idx) => {
+        const realIndex = state.tasks.indexOf(t);
+        const tr = h("tr", {
+          onclick: () => selectTask(realIndex),
+        }, [
+          h("td", null, [String(t.id ?? "-"), statusIsUnknown(t) || taskHasRefError(t) ? " " : null,
+            statusIsUnknown(t) ? h("span", { class: "badge unknown" }, ["상태?"]) : null,
+            taskHasRefError(t) ? h("span", { class: "badge ref-error" }, ["참조오류"]) : null]),
+          h("td", null, [String(t.status ?? "-")]),
+          h("td", null, [String(t.category ?? "-")]),
+          h("td", null, [t.priority === null || t.priority === undefined ? "-" : String(t.priority)]),
+          h("td", null, [t.owner === null || t.owner === undefined ? "-" : String(t.owner)]),
+          h("td", null, [String(t.title ?? "-")]),
+        ]);
+        if (realIndex === state.selectedIndex) tr.classList.add("selected");
+        els.taskTbody.appendChild(tr);
+      });
+    }
+
+    els.resultCount.textContent = filtered.length + " / " + state.tasks.length + "건 표시";
+  }
+
+  function selectTask(index) {
+    state.selectedIndex = index;
+    renderTable();
+    renderDetail(state.tasks[index]);
+  }
+
+  // field helpers: "정보 없음" = key missing entirely, "미지정" = key present but null
+  function fieldNode(obj, key, formatter) {
+    if (!obj || !Object.prototype.hasOwnProperty.call(obj, key)) {
+      return h("span", { class: "muted-value" }, ["정보 없음"]);
+    }
+    const v = obj[key];
+    if (v === null) return h("span", { class: "muted-value" }, ["미지정"]);
+    return formatter ? formatter(v) : text(String(v));
+  }
+
+  function renderDeps(t) {
+    if (!Object.prototype.hasOwnProperty.call(t, "deps")) return h("span", { class: "muted-value" }, ["정보 없음"]);
+    const deps = t.deps;
+    if (!Array.isArray(deps) || deps.length === 0) return h("span", { class: "muted-value" }, ["없음"]);
+    const ul = h("ul", { class: "chip-list" }, []);
+    for (const d of deps) {
+      const broken = !state.idSet.has(d);
+      ul.appendChild(h("li", { class: broken ? "broken" : "" }, [broken ? "⚠ " + d + " (존재하지 않는 id)" : String(d)]));
+    }
+    return ul;
+  }
+
+  // "doc" field: shows the path as plain text (never opened automatically),
+  // plus an explicit view button that only reads a file the user hand-picks
+  // in a native dialog -- the picked file need not literally be at that path,
+  // the user is trusted to pick the right one.
+  function renderDocField(t) {
+    if (!Object.prototype.hasOwnProperty.call(t, "doc")) return h("span", { class: "muted-value" }, ["정보 없음"]);
+    if (t.doc === null) return h("span", { class: "muted-value" }, ["미지정"]);
+
+    const id = t.id;
+    const cacheEntry = state.docFieldCache.get(id);
+    const wrap = h("div", null, [text(String(t.doc))]);
+    const pickBtn = h("button", {
+      type: "button",
+      onclick: () => { state.pendingDocTarget = { kind: "docField", id }; els.docFileInput.click(); },
+    }, [cacheEntry && cacheEntry.status === "loaded" ? "다른 파일로 다시 선택" : "이 문서 파일 선택해서 보기"]);
+    wrap.appendChild(pickBtn);
+    if (cacheEntry && cacheEntry.status === "loaded") {
+      wrap.appendChild(h("pre", { class: "evidence-box" }, [cacheEntry.content]));
+    }
+    return wrap;
+  }
+
+  function renderParent(t) {
+    if (!Object.prototype.hasOwnProperty.call(t, "parent")) return h("span", { class: "muted-value" }, ["정보 없음"]);
+    if (t.parent === null) return h("span", { class: "muted-value" }, ["미지정"]);
+    const broken = !state.idSet.has(t.parent);
+    return broken
+      ? h("span", { class: "chip-list" }, [h("span", { class: "badge ref-error" }, ["⚠ " + t.parent + " (존재하지 않는 id)"])])
+      : text(String(t.parent));
+  }
+
+  function renderLog(t) {
+    if (!Object.prototype.hasOwnProperty.call(t, "log")) return h("span", { class: "muted-value" }, ["정보 없음"]);
+    const log = t.log;
+    if (!Array.isArray(log)) return h("span", { class: "muted-value" }, ["log가 배열이 아닙니다: " + JSON.stringify(log)]);
+    if (log.length === 0) return h("span", { class: "muted-value" }, ["기록 없음"]);
+    const ul = h("ul", { class: "log-list" }, []);
+    log.forEach((entry) => {
+      if (!entry || typeof entry !== "object") {
+        ul.appendChild(h("li", null, [JSON.stringify(entry)]));
+        return;
+      }
+      const when = Object.prototype.hasOwnProperty.call(entry, "at") ? (entry.at === null ? "미지정" : String(entry.at)) : "정보 없음";
+      const from = Object.prototype.hasOwnProperty.call(entry, "from") ? (entry.from === null ? "미지정" : String(entry.from)) : "정보 없음";
+      const to = Object.prototype.hasOwnProperty.call(entry, "to") ? (entry.to === null ? "미지정" : String(entry.to)) : "정보 없음";
+      const note = Object.prototype.hasOwnProperty.call(entry, "note") ? (entry.note === null ? "메모 없음" : String(entry.note)) : "정보 없음";
+      ul.appendChild(h("li", null, [
+        h("span", { class: "log-when" }, [when]),
+        text("  " + from + " → " + to + (note ? "  ·  " + note : "")),
+      ]));
+    });
+    return ul;
+  }
+
+  function renderDetail(t) {
+    clear(els.detailPane);
+    if (!t) {
+      els.detailPane.appendChild(h("p", { class: "placeholder" }, ["왼쪽 목록에서 작업을 선택하면 상세 정보가 여기 표시됩니다."]));
+      return;
+    }
+
+    const header = h("div", { class: "detail-header" }, [
+      h("span", { class: "id" }, [String(t.id ?? "(id 없음)")]),
+      h("span", { class: "badge" }, [String(t.status ?? "-")]),
+      h("span", { class: "badge" }, [String(t.category ?? "-")]),
+      h("span", { class: "badge" }, ["우선순위: " + (t.priority === null || t.priority === undefined ? "미지정" : String(t.priority))]),
+    ]);
+    els.detailPane.appendChild(header);
+    els.detailPane.appendChild(h("p", null, [String(t.title ?? "(제목 없음)")]));
+
+    const dl = h("dl", { class: "detail" }, []);
+    function row(label, node) {
+      dl.appendChild(h("dt", null, [label]));
+      dl.appendChild(h("dd", null, [node]));
+    }
+
+    row("summary", fieldNode(t, "summary"));
+    row("done_when", fieldNode(t, "done_when"));
+    row("deps", renderDeps(t));
+    row("parent", renderParent(t));
+    row("doc (경로 텍스트 표시, 파일은 직접 선택해야 열림)", renderDocField(t));
+    row("where", fieldNode(t, "where"));
+    row("est_min", fieldNode(t, "est_min", (v) => text(String(v) + "분")));
+    row("gate (표시 전용 — 실행되지 않음)", fieldNode(t, "gate", (v) => h("div", { class: "gate-box" }, [String(v)])));
+    row("owner", fieldNode(t, "owner"));
+    row("claimed_at", fieldNode(t, "claimed_at"));
+    row("updated_at", fieldNode(t, "updated_at"));
+    row("log", renderLog(t));
+
+    els.detailPane.appendChild(dl);
+
+    // done_at / evidence: shown ONLY when actually present (key exists and not null)
+    const extra = h("dl", { class: "detail" }, []);
+    let hasExtra = false;
+    if (Object.prototype.hasOwnProperty.call(t, "done_at") && t.done_at !== null && t.done_at !== undefined) {
+      extra.appendChild(h("dt", null, ["done_at"]));
+      extra.appendChild(h("dd", null, [String(t.done_at)]));
+      hasExtra = true;
+    }
+    if (Object.prototype.hasOwnProperty.call(t, "evidence") && t.evidence !== null && t.evidence !== undefined) {
+      extra.appendChild(h("dt", null, ["evidence"]));
+      const pretty = typeof t.evidence === "object" ? JSON.stringify(t.evidence, null, 2) : String(t.evidence);
+      extra.appendChild(h("dd", null, [h("div", { class: "evidence-box" }, [pretty])]));
+      hasExtra = true;
+    }
+    if (hasExtra) els.detailPane.appendChild(extra);
+
+    // Related detail_doc (falls back to docs/backlog/<id>.md) viewer. Unlike
+    // the free-text "doc" field above, this one auto-loads on selection: same-
+    // origin fetch first, then the connected folder, then (once) a folder-
+    // access prompt -- see ensureDocForTask. A path containing ".."/absolute
+    // segments is refused there and always falls through to manual picking
+    // below, same as "not_found"/"unavailable".
+    if (t && Object.prototype.hasOwnProperty.call(t, "id")) {
+      const docId = t.id;
+      const docPath = detailDocPath(t);
+      const docSection = h("div", { class: "doc-section" }, []);
+      docSection.appendChild(h("h2", null, ["상세 문서 (" + docPath + ")"]));
+      const cacheEntry = state.docCache.get(docId);
+
+      function manualPickButton(label) {
+        return h("button", {
+          type: "button",
+          onclick: () => { state.pendingDocTarget = { kind: "backlogDoc", id: docId }; els.docFileInput.click(); },
+        }, [label]);
+      }
+
+      if (cacheEntry && cacheEntry.status === "loaded") {
+        docSection.appendChild(h("pre", { class: "evidence-box" }, [cacheEntry.content]));
+        docSection.appendChild(manualPickButton("다른 파일로 다시 선택"));
+      } else if (cacheEntry) {
+        // not_found | blocked | unavailable -- all show why, plus a manual fallback
+        docSection.appendChild(h("p", { class: "muted-value" }, [cacheEntry.message]));
+        docSection.appendChild(manualPickButton("문서 파일 직접 선택"));
+      } else {
+        docSection.appendChild(h("p", { class: "muted-value" }, ["불러오는 중..."]));
+        ensureDocForTask(docId, docPath).then(() => {
+          const cur = state.tasks[state.selectedIndex];
+          if (cur && cur.id === docId) renderDetail(cur);
+        });
+      }
+      els.detailPane.appendChild(docSection);
+    }
+  }
+})();
+</script>
+</body>
+</html>

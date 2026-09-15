@@ -1,0 +1,14 @@
+run_id,epoch,timestamp,entropy,reward,reward_all_zero,policy_loss,gradient_norm
+anomaly_demo,1,2026-09-15T00:00:00Z,0.95,2.1,false,5.5,11.4
+anomaly_demo,2,2026-09-15T00:06:00Z,0.91,3.0,false,5.2,12.0
+anomaly_demo,3,2026-09-15T00:12:00Z,0.88,3.8,false,5.0,10.8
+anomaly_demo,4,2026-09-15T00:18:00Z,0.85,4.5,false,4.8,11.9
+anomaly_demo,5,2026-09-15T00:24:00Z,0.81,89.4,false,128.7,912.4
+anomaly_demo,6,2026-09-15T00:30:00Z,0.79,5.0,false,4.9,13.2
+anomaly_demo,7,2026-09-15T00:36:00Z,0.77,4.7,false,nan,inf
+anomaly_demo,8,2026-09-15T00:42:00Z,0.75,0.0,true,4.6,12.1
+anomaly_demo,9,2026-09-15T00:48:00Z,0.58,6.2,false,4.4,11.8
+anomaly_demo,10,2026-09-15T00:54:00Z,0.42,6.5,false,4.3,12.0
+anomaly_demo,11,2026-09-15T01:00:00Z,0.31,6.7,false,4.2,11.6
+anomaly_demo,12,2026-09-15T01:06:00Z,0.15,6.9,false,4.1,12.3
+anomaly_demo,13,2026-09-15T01:12:00Z,0.02,7.0,false,4.0,11.9

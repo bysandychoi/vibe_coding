@@ -1,0 +1,18 @@
+{
+  "name": "sdc-day1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "lint": "node tools/checks/lint-check.mjs",
+    "check:length": "node tools/checks/length-check.mjs",
+    "build": "node tools/checks/build-check.mjs",
+    "check": "npm run lint && npm run build && npm run check:length"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0"
+  }
+}

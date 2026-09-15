@@ -1,0 +1,120 @@
+{
+  "permissions": {
+    "deny": [
+      "Edit(data/*.csv)",
+      "Write(data/*.csv)",
+      "Bash(rm data/*.csv)",
+      "Bash(mv data/*.csv *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "statusMessage": "Checking protected dataset guard...",
+            "command": "$j=[Console]::In.ReadToEnd()|ConvertFrom-Json; $fp=$j.tool_input.file_path; if($fp){ $bs=[char]92; $n=$fp.Replace($bs,'/').ToLower(); if($n -eq 'data/inspection.csv' -or $n.EndsWith('/data/inspection.csv')){[Console]::Error.WriteLine('BLOCKED: data/inspection.csv is a protected read-only dataset (see CLAUDE.md / .claude/rules/data-handling.md). Edits and deletions are not allowed.'); exit 2} }; exit 0"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "statusMessage": "Checking protected dataset guard...",
+            "command": "$j=[Console]::In.ReadToEnd()|ConvertFrom-Json; $cmd=$j.tool_input.command; if($cmd -and $cmd.ToLower().Contains('inspection.csv')){ $hit=$false; if($cmd.Contains('>')){$hit=$true}; if($cmd -match '(?i)(Remove-Item|Move-Item|Copy-Item|Set-Content|Out-File|Clear-Content)'){$hit=$true}; $tokens=$cmd -split ' '; foreach($t in $tokens){ if(@('rm','del','mv','cp','tee','truncate','sed') -contains $t.ToLower()){$hit=$true} }; if($hit){[Console]::Error.WriteLine('BLOCKED: this command appears to modify or delete data/inspection.csv, a protected read-only dataset (see CLAUDE.md / .claude/rules/data-handling.md).'); exit 2} }; exit 0"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "statusMessage": "Checking backlog.json schema/policy guard...",
+            "timeout": 10,
+            "command": "$j=[Console]::In.ReadToEnd()|ConvertFrom-Json; $ti=$j.tool_input; $fp=$ti.file_path; if(-not $fp){exit 0}; $bs=[char]92; $norm=$fp.Replace($bs,'/').ToLower(); if($norm -ne 'backlog.json' -and -not $norm.EndsWith('/backlog.json')){exit 0}; try { if($ti.PSObject.Properties.Name -contains 'content'){$newContent=$ti.content} elseif($ti.PSObject.Properties.Name -contains 'old_string'){ if(-not (Test-Path -LiteralPath $fp)){exit 0}; $cur=Get-Content -Raw -LiteralPath $fp -Encoding UTF8; $old=$ti.old_string; $new=$ti.new_string; if($ti.replace_all){$newContent=$cur.Replace($old,$new)} else { $idx=$cur.IndexOf($old); if($idx -lt 0){exit 0}; $newContent=$cur.Substring(0,$idx)+$new+$cur.Substring($idx+$old.Length) } } else { exit 0 }; $parsed=$newContent|ConvertFrom-Json -ErrorAction Stop; if(-not $parsed.enums -or -not $parsed.tasks){[Console]::Error.WriteLine('BLOCKED: backlog.json edit result is missing enums or tasks structure.'); exit 2}; $validStatus=@($parsed.enums.status); $validPriority=@($parsed.enums.priority); $validCategory=@($parsed.enums.category); $errors=@(); foreach($t in $parsed.tasks){ if($validStatus -notcontains $t.status){$errors+=\"task $($t.id): status '$($t.status)' is not in enums.status\"}; if($t.priority -ne $null -and ($validPriority -notcontains $t.priority)){$errors+=\"task $($t.id): priority '$($t.priority)' is not in enums.priority\"}; if($validCategory -notcontains $t.category){$errors+=\"task $($t.id): category '$($t.category)' is not in enums.category\"}; if($t.category -eq 'decision' -and $t.status -eq 'done'){$errors+=\"task $($t.id): category=decision tasks cannot be marked done by an automated edit (owner=user policy in backlog meta)\"} }; if($errors.Count -gt 0){[Console]::Error.WriteLine('BLOCKED: backlog.json edit violates policy:'); foreach($e in $errors){[Console]::Error.WriteLine(' - ' + $e)}; exit 2}; exit 0 } catch { [Console]::Error.WriteLine('BLOCKED: backlog.json edit result is not valid JSON, or the guard script failed: ' + $_.Exception.Message); exit 2 }"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "statusMessage": "Checking backlog.json direct-read guard...",
+            "command": "$j=[Console]::In.ReadToEnd()|ConvertFrom-Json; $fp=$j.tool_input.file_path; if($fp){ $bs=[char]92; $n=$fp.Replace($bs,'/').ToLower(); if($n -eq 'backlog.json' -or $n.EndsWith('/backlog.json')){ [Console]::Error.WriteLine('BLOCKED: direct Read of backlog.json is disabled (see CLAUDE.md).'); [Console]::Error.WriteLine('Use the read-only query CLI instead, e.g.:'); [Console]::Error.WriteLine('  node tools/backlog-cli.mjs list'); [Console]::Error.WriteLine('  node tools/backlog-cli.mjs show <id>'); [Console]::Error.WriteLine('  node tools/backlog-cli.mjs ready --explain'); [Console]::Error.WriteLine('  node tools/backlog-cli.mjs walk'); [Console]::Error.WriteLine('Scope: only blocks the Read tool when file_path resolves to backlog.json; other files are unaffected.'); exit 2 } }; exit 0"
+          }
+        ]
+      },
+      {
+        "matcher": "Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "statusMessage": "Checking backlog.json direct-read guard...",
+            "command": "$j=[Console]::In.ReadToEnd()|ConvertFrom-Json; $ti=$j.tool_input; $bs=[char]92; $hit=$false; if($ti.path){ $np=$ti.path.Replace($bs,'/').ToLower(); if($np -eq 'backlog.json' -or $np.EndsWith('/backlog.json')){$hit=$true} }; if($ti.glob){ $ng=$ti.glob.ToLower(); if($ng -eq 'backlog.json' -or $ng -eq '**/backlog.json'){$hit=$true} }; if($hit){ [Console]::Error.WriteLine('BLOCKED: Grep targeting backlog.json directly is disabled; it would surface raw content outside the query CLI.'); [Console]::Error.WriteLine('Use instead:'); [Console]::Error.WriteLine('  node tools/backlog-cli.mjs list --search <text>'); [Console]::Error.WriteLine('  node tools/backlog-cli.mjs show <id>'); [Console]::Error.WriteLine('Scope: only blocks Grep calls whose path or glob param explicitly targets backlog.json; a repo-wide Grep without that param is not inspected.'); exit 2 }; exit 0"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "statusMessage": "Checking backlog.json direct-read guard...",
+            "command": "$j=[Console]::In.ReadToEnd()|ConvertFrom-Json; $cmd=$j.tool_input.command; if(-not $cmd){exit 0}; $bs=[char]92; $normOps=$cmd.Replace('&&',';').Replace('||',';').Replace('|',';'); $segments=$normOps -split ';'; $blocked=$false; foreach($seg in $segments){ $segLower=$seg.ToLower(); if($segLower.Contains('backlog-cli')){continue}; $segPath=$seg.Replace($bs,'/').ToLower(); if(-not $segPath.Contains('backlog.json')){continue}; $hit=$false; $tokens=$seg -split ' '; foreach($t in $tokens){ if(@('cat','type','more','less','head','tail','nl','tac','strings','od','xxd','hexdump','findstr','curl','wget','gc','iwr','get-content','select-string','import-csv','invoke-webrequest') -contains $t.ToLower()){$hit=$true} }; foreach($s in @('readalltext','readalllines','readallbytes','open(','readfilesync')){ if($segLower.Contains($s)){$hit=$true} }; if($hit){$blocked=$true; break} }; if($blocked){ [Console]::Error.WriteLine('BLOCKED: this command appears to read backlog.json directly outside the query CLI (see CLAUDE.md).'); [Console]::Error.WriteLine('Use the validated read-only CLI instead:'); [Console]::Error.WriteLine('  node tools/backlog-cli.mjs list'); [Console]::Error.WriteLine('  node tools/backlog-cli.mjs show <id>'); [Console]::Error.WriteLine('  node tools/backlog-cli.mjs ready --explain'); [Console]::Error.WriteLine('  node tools/backlog-cli.mjs walk'); [Console]::Error.WriteLine('  node tools/backlog-cli.mjs validate'); [Console]::Error.WriteLine('Scope: matches known read commands/cmdlets referencing backlog.json per command segment (split on &&, ||, ;, |); not a full sandbox, and unusual shell code could still bypass this.'); exit 2 }; exit 0"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["tools/checks/post-edit-check.mjs"],
+            "timeout": 20,
+            "statusMessage": "Running fast code checks (length/build/lint) on edited file..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["tools/checks/stop-check.mjs"],
+            "timeout": 120,
+            "statusMessage": "Running full code checks (lint/build/length) before finishing..."
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "statusMessage": "작업 완료 알림 재생 중...",
+            "async": true,
+            "timeout": 15,
+            "command": "Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('작업이 끝났습니다')"
+          }
+        ]
+      }
+    ]
+  }
+}

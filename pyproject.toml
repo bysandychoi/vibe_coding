@@ -1,0 +1,11 @@
+[tool.pylint."messages control"]
+# Docstrings are intentionally not required project-wide (see CLAUDE.md:
+# comments/docstrings are only added when the WHY is non-obvious). Disabling
+# these keeps pylint focused on real correctness issues (unused vars/imports,
+# undefined names, etc.), matching the strictness level of this repo's
+# ESLint config rather than adding a style requirement ESLint doesn't have.
+disable = [
+  "missing-module-docstring",
+  "missing-function-docstring",
+  "missing-class-docstring",
+]

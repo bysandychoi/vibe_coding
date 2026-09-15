@@ -1,0 +1,5 @@
+equipment_id,result,action_note
+EQ-001,OK,
+EQ-002,NG,
+EQ-003,NG,"   "
+EQ-004,NG,필터 교체

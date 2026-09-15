@@ -1,0 +1,480 @@
+{
+  "$schema_version": "1.1",
+  "meta": {
+    "updated": "2026-09-15",
+    "context_doc": "problem.md",
+    "max_est_min": 30,
+    "note": "sdc-day1 작업 백로그(수동 관리, CLI 없음 — 직접 JSON 편집). 두 트랙: T1(저장소 실습 — 점검 기록/Hook 미구현 항목), T2(problem.md RL 이상 감지 시스템 설계 — 미결 질문 다수 포함). category='decision' 항목은 Claude가 대신 결정할 수 없는 사용자 결정 사항."
+  },
+  "enums": {
+    "status": [
+      "todo",
+      "in_progress",
+      "in_review",
+      "needs_info",
+      "blocked",
+      "done",
+      "cancelled"
+    ],
+    "priority": [
+      "P0",
+      "P1",
+      "P2",
+      "P3",
+      null
+    ],
+    "category": [
+      "spike",
+      "feature",
+      "infra",
+      "test",
+      "docs",
+      "security",
+      "bug",
+      "cleanup",
+      "release",
+      "skill",
+      "decision"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "status": "done",
+      "priority": null,
+      "category": "infra",
+      "title": "저장소 실습 — 점검 기록/Hook 미구현 항목",
+      "summary": "README.md가 언급하는 /inspection-check, problem-reader 서브에이전트, /hooks가 .claude/에 아직 없음(commands/, agents/ 디렉터리 부재).",
+      "where": ".claude/",
+      "parent": null,
+      "deps": [],
+      "doc": "problem-seed.md",
+      "done_when": "T1-1~T1-4 전부 done",
+      "est_min": null,
+      "gate": null,
+      "owner": null,
+      "claimed_at": null,
+      "updated_at": "2026-09-15T06:33:22.182Z",
+      "log": [
+        {
+          "at": "2026-09-15T06:33:22.182Z",
+          "from": "todo",
+          "to": "done",
+          "note": "T1-1~T1-4 전부 done 확인됨. done_when 충족."
+        }
+      ],
+      "done_at": "2026-09-15T06:33:22.182Z",
+      "evidence": null,
+      "detail_doc": "docs/backlog/T1.md"
+    },
+    {
+      "id": "T1-1",
+      "status": "done",
+      "priority": null,
+      "category": "test",
+      "title": "Windows/PowerShell Hook 동작 검증",
+      "summary": "data/inspection.csv Edit/Write 및 rm/mv 시도로 PreToolUse Hook 차단(exit 2)을 실제로 확인. README는 macOS 기준 검증만 명시.",
+      "where": ".claude/settings.json",
+      "parent": "T1",
+      "deps": [],
+      "doc": null,
+      "done_when": "차단 로그(exit 2) 캡처 및 정상 파일에서는 차단 안 됨을 확인",
+      "est_min": 30,
+      "gate": null,
+      "owner": null,
+      "claimed_at": null,
+      "updated_at": "2026-09-15T05:33:13.477Z",
+      "log": [
+        {
+          "at": "2026-09-15T05:11:19.749Z",
+          "from": "todo",
+          "to": "in_progress",
+          "note": "착수: fork로 병렬 구현 시작"
+        },
+        {
+          "at": "2026-09-15T05:16:09.931Z",
+          "from": "in_progress",
+          "to": "in_review",
+          "note": "구현+검증 완료(Bash 경로 exit2 확인, Edit/Write는 permissions.deny로 차단되어 Hook 스크립트 자체 검증은 아님). npm run check 통과."
+        },
+        {
+          "at": "2026-09-15T05:33:13.477Z",
+          "from": "in_review",
+          "to": "done",
+          "note": "critical-reviewer Critical/High 지적 반영 완료: Bash 경로 Hook 스크립트 각 분기(redirect/정규식/토큰) 실제 exit2 확인, README 오류 정정 및 Edit/Write 경로 한계 명시. npm run check 통과."
+        }
+      ],
+      "done_at": "2026-09-15T05:33:13.477Z",
+      "evidence": "Bash 경로 Hook 스크립트(matcher Bash|PowerShell)는 Windows에서 실제로 exit 2 반환하며 동작 확인: (1) redirect 분기, (2) cmdlet 정규식 분기(파일 이동 명령으로 확인), (3) 토큰 목록 분기(치환/파이프/이름변경 명령으로 확인). 보호 대상 CSV는 전 과정에서 실제로는 전혀 수정되지 않음(재확인함). 정상 파일(data/sample.csv 생성 시도)은 permissions.deny(data 폴더 전체 csv 범위)로 차단됨 - Hook 자체 범위(보호 대상 파일 한정)와 permissions 범위(data 폴더 전체 csv) 비대칭 확인. Edit/Write 경로는 permissions.deny가 먼저 차단해 그 경로의 PowerShell Hook 스크립트 자체는 단독 검증 못함(permissions 끄지 않는 한 불가, out of scope) - README.md에 이 한계를 명시적으로 기록함. README.md의 기존 보호파일명 기술 오류도 실제 설정 기준으로 정정함.",
+      "detail_doc": "docs/backlog/T1-1.md"
+    },
+    {
+      "id": "T1-2",
+      "status": "done",
+      "priority": null,
+      "category": "feature",
+      "title": "/inspection-check 커맨드 작성",
+      "summary": "data/inspection.csv에서 result=NG이고 action_note 공백/빈값인 행(메모 누락)을 찾는 슬래시 커맨드. .claude/rules/data-handling.md 규칙 적용, OK 행 예외 처리.",
+      "where": ".claude/commands/inspection-check.md",
+      "parent": "T1",
+      "deps": [],
+      "doc": ".claude/rules/data-handling.md",
+      "done_when": "샘플 CSV(EQ-002, EQ-003 메모 누락)에서 올바르게 검출",
+      "est_min": 30,
+      "gate": null,
+      "owner": null,
+      "claimed_at": null,
+      "updated_at": "2026-09-15T05:36:55.104Z",
+      "log": [
+        {
+          "at": "2026-09-15T05:11:27.387Z",
+          "from": "todo",
+          "to": "in_progress",
+          "note": "착수: fork로 병렬 구현 시작"
+        },
+        {
+          "at": "2026-09-15T05:16:16.686Z",
+          "from": "in_progress",
+          "to": "in_review",
+          "note": "구현 완료(.claude/commands/inspection-check.md), npm run check 통과."
+        },
+        {
+          "at": "2026-09-15T05:34:01.560Z",
+          "from": "in_review",
+          "to": "done",
+          "note": "critical-reviewer High/Medium 지적 반영: 실제 실행 증거 확보, 따옴표 처리 일반화. 허용값(OK/NG)이 data-handling.md 미정의라 잠정 가정으로 문서화(사용자 확인 대기, 별도 안내함). npm run check 통과."
+        }
+      ],
+      "done_at": "2026-09-15T05:34:01.560Z",
+      "evidence": "실제 /inspection-check 커맨드 지시문을 이 세션에서 직접 실행해 보호 대상 CSV(EQ-001~EQ-004)를 판정: 메모 누락=EQ-002,EQ-003(둘 다 NG+trim 결과 빈 문자열), 정상(NG+메모있음)=EQ-004, 확인필요(허용값 외)=없음(전 행 OK/NG만 사용). 따옴표-제거+trim 절차를 일반화함(샘플 리터럴 하드코딩 제거). 허용값(OK/NG)이 data-handling.md에 명시된 목록은 아니었으나, 사용자에게 직접 확인함 - 실제 운영에서 OK/NG 외 다른 값은 나오지 않는다고 확답받아 커맨드 파일의 '잠정 가정' 문구를 '확인된 허용값'으로 갱신함. Read 실행 결과 CSV 원본은 수정되지 않음.",
+      "detail_doc": "docs/backlog/T1-2.md"
+    },
+    {
+      "id": "T1-3",
+      "status": "done",
+      "priority": null,
+      "category": "feature",
+      "title": "problem-reader 서브에이전트 작성",
+      "summary": "problem.md(있으면)/problem-seed.md를 읽고 요약하는 서브에이전트 등록.",
+      "where": ".claude/agents/problem-reader.md",
+      "parent": "T1",
+      "deps": [],
+      "doc": null,
+      "done_when": "/agents에서 problem-reader 등록 확인, 호출 시 problem.md 또는 problem-seed.md 요약 반환",
+      "est_min": 30,
+      "gate": null,
+      "owner": null,
+      "claimed_at": null,
+      "updated_at": "2026-09-15T06:16:21.714Z",
+      "log": [
+        {
+          "at": "2026-09-15T05:11:34.183Z",
+          "from": "todo",
+          "to": "in_progress",
+          "note": "착수: fork로 병렬 구현 시작"
+        },
+        {
+          "at": "2026-09-15T05:16:23.325Z",
+          "from": "in_progress",
+          "to": "in_review",
+          "note": "구현 완료(.claude/agents/problem-reader.md), npm run check 통과."
+        },
+        {
+          "at": "2026-09-15T06:16:21.714Z",
+          "from": "in_review",
+          "to": "done",
+          "note": "critical-reviewer 지적(problem-seed.md 오분류, §4/§7 슬롯 누락, 라벨 불일치) 수정 완료 + 이번 재호출에서 수정된 동작 실행 증거 확보. npm run check 통과."
+        }
+      ],
+      "done_at": "2026-09-15T06:16:21.714Z",
+      "evidence": "재호출 성공: 이 세션에서 problem-reader를 다시 호출한 결과 수정된 버전대로 정상 동작함을 확인 - '확인한 사실' 라벨(문서 실제 제목과 일치), '원인 가설' 섹션, '입력/기대 결과 예시' 섹션 모두 요약에 정상 반영됨. 이전 재호출 시도에서 관측된 캐시 문제(수정 전 버전으로 동작)는 이번엔 재현되지 않음 - 원인은 불명확하나(세션 내 캐시가 일정 시간/턴 후 갱신되는 것으로 추정, 확인된 사실 아님) 결과적으로 done_when의 실행 증거를 확보함. npm run check 기존에 통과 확인됨(파일 추가 수정 없음).",
+      "detail_doc": "docs/backlog/T1-3.md"
+    },
+    {
+      "id": "T1-4",
+      "status": "done",
+      "priority": null,
+      "category": "feature",
+      "title": "/hooks 커맨드로 보호 파일 Hook 확인 실습",
+      "summary": "data/inspection.csv Edit/삭제 차단 여부를 확인하는 절차를 /hooks 커맨드로 정리, 실제 시도로 시연(기존 protected-demo.md 전제를 실제 대상 기준으로 수정함 - 사용자 결정).",
+      "where": ".claude/commands/hook-check.md",
+      "parent": "T1",
+      "deps": [
+        "T1-1"
+      ],
+      "doc": ".claude/settings.json",
+      "done_when": "data/inspection.csv에 대해 Edit·Write(permissions.deny)와 Bash Hook의 리다이렉트/토큰 두 분기(비파괴적 명령으로) 각각 차단 확인, data 폴더 내 다른 csv도 permissions.deny로 차단됨을 확인, data 폴더 밖 무관한 파일은 차단 안 됨을 확인, 실습 전후 원본 내용 동일함을 확인",
+      "est_min": 30,
+      "gate": null,
+      "owner": null,
+      "claimed_at": null,
+      "updated_at": "2026-09-15T06:30:21.815Z",
+      "log": [
+        {
+          "at": "2026-09-15T05:38:47.512Z",
+          "from": "todo",
+          "to": "needs_info",
+          "note": "summary/doc(protected-demo.md)와 done_when(같은 이름 하위 파일도 차단)이 실제 Hook 동작과 다름 - 저장소에 protected-demo.md 파일이 없고, 실제 Hook은 파일명 패턴이 아니라 data/inspection.csv라는 특정 경로만 검사함(T1-1/README.md 검증으로 확인됨). 사용자가 needs_info로 보류 결정, 명세를 실제 대상 기준으로 고칠지 여부 확인 필요."
+        },
+        {
+          "at": "2026-09-15T06:20:44.011Z",
+          "from": "needs_info",
+          "to": "in_progress",
+          "note": "사용자 결정: 실제 대상(data/inspection.csv) 기준으로 명세 수정 후 착수. summary/done_when/doc 필드 갱신 완료."
+        },
+        {
+          "at": "2026-09-15T06:23:53.138Z",
+          "from": "in_progress",
+          "to": "in_review",
+          "note": "C:/Program Files/Git/hooks가 Claude Code 내장 명령어라 이름 충돌 확인 - hook-check로 개명(README도 수정). .claude/commands/hook-check.md 작성 완료, npm run check 통과. /hook-check 실제 슬래시 커맨드 호출은 이 세션에서 즉시 등록 확인 안 됨(Skill 도구로 시도 시 Unknown skill - T1-3에서도 있었던 세션 내 등록 지연 패턴으로 추정)."
+        },
+        {
+          "at": "2026-09-15T06:30:21.815Z",
+          "from": "in_review",
+          "to": "done",
+          "note": "Critical 안전성 문제(되돌릴 수 없는 명령) 포함 critical-reviewer 지적 전부 해소, 실제 실행 증거 확보(0~6단계 전부 이 세션에서 재현). npm run check 통과."
+        }
+      ],
+      "done_at": "2026-09-15T06:30:21.815Z",
+      "evidence": "critical-reviewer Critical 1(rm 등 되돌릴 수 없는 명령이 커맨드에 있어 Hook 미발동 시 복구불가 - git repo 아님) + High 6 + Medium 4 전부 반영: 0단계(사전 Read 기록) 추가, rm/mv를 비파괴적 sed/redirect 예시로 교체, Edit+Write 둘 다 시연, data/sample.csv로 permissions.deny 범위(data 폴더 전체 csv) 시연, 무관 파일명에 inspection.csv 문자열 금지 명시, 4단계 결론을 '계층별 개별 차단'으로 정정, allowed-tools에 Read 추가, done_when을 Hook의 리다이렉트/토큰 두 분기로 구체화, README.md에 rm/mv deny 규칙 및 NotebookEdit matcher·파일명 매칭 방식 추가. 새로 쓴 커맨드를 이 세션에서 Skill로 실제 재호출해 0~6단계 전부 직접 실행 완료(Edit/Write 둘 다 permissions.deny 차단, sed/redirect 둘 다 Hook exit2 차단, data/sample.csv도 차단, 스크래치 무관 파일은 차단 없이 성공, 원본 내용 실습 전후 완전 동일 확인). npm run check 통과.",
+      "detail_doc": "docs/backlog/T1-4.md"
+    },
+    {
+      "id": "T2",
+      "status": "todo",
+      "priority": null,
+      "category": "spike",
+      "title": "problem.md — RL 스케줄러 이상 감지 시스템 설계",
+      "summary": "REINFORCE 스케줄러 학습 이상 조기 감지 시스템의 미결 질문(§8)을 해결하고 설계를 구체화. 현재 저장소에 코드로 구현된 것은 없음(초안 단계).",
+      "where": null,
+      "parent": null,
+      "deps": [],
+      "doc": "problem.md",
+      "done_when": "T2-1~T2-7 전부 done",
+      "est_min": null,
+      "gate": null,
+      "owner": null,
+      "claimed_at": null,
+      "updated_at": "2026-09-15T04:44:42.629Z",
+      "log": [],
+      "done_at": null,
+      "evidence": null,
+      "detail_doc": "docs/backlog/T2.md"
+    },
+    {
+      "id": "T2-1",
+      "status": "done",
+      "priority": null,
+      "category": "decision",
+      "title": "gradient explosion 임계치 산출 방식 결정",
+      "summary": "정상 학습 5회 baseline에서 평균+표준편차 / 최댓값 / percentile 중 어떤 통계량을 쓸지 결정.",
+      "where": null,
+      "parent": "T2",
+      "deps": [],
+      "doc": "problem.md",
+      "done_when": "임계치 산출 방식과 수치가 문서화됨",
+      "est_min": 30,
+      "gate": null,
+      "owner": "user",
+      "claimed_at": null,
+      "updated_at": "2026-09-15T06:41:50.254Z",
+      "log": [
+        {
+          "at": "2026-09-15T06:41:50.254Z",
+          "from": "todo",
+          "to": "done",
+          "note": "[user-confirmed: decision category, done via explicit override] gradient explosion 임계치 통계량 = 평균+k*표준편차, k=5. 대화 중 AskUserQuestion으로 명시적으로 확인된 사용자 결정."
+        }
+      ],
+      "done_at": "2026-09-15T06:41:50.254Z",
+      "evidence": "사용자 결정: 통계량=평균+k*표준편차(baseline 5회 전체 epoch의 gradient_norm 값을 풀링해 산출), k=5(초기값, baseline 관찰 후 오탐/누락 보고 조정 가능). problem.md 6절(Gradient explosion 임계치 결정 방법 행)/8절(관련 미결 질문 제거)에 반영 완료. 단 baseline 5회 자체가 아직 수행되지 않아 실제 임계치 수치는 여전히 미정 - 이건 T2-2('정상 run' 판별 기준)가 먼저 해결돼야 baseline 수집이 가능함.",
+      "detail_doc": "docs/backlog/T2-1.md"
+    },
+    {
+      "id": "T2-2",
+      "status": "todo",
+      "priority": null,
+      "category": "decision",
+      "title": "'정상 run' 5회 판별 기준 결정",
+      "summary": "사람이 직접 보고 정상이라 판단할지, 별도 기준을 둘지 결정.",
+      "where": null,
+      "parent": "T2",
+      "deps": [],
+      "doc": "problem.md",
+      "done_when": "판별 기준 문서화",
+      "est_min": 30,
+      "gate": null,
+      "owner": "user",
+      "claimed_at": null,
+      "updated_at": "2026-09-15T05:53:31.961Z",
+      "log": [],
+      "done_at": null,
+      "evidence": "사용자 결정: 최소 자동 필터 + 사람 최종승인 방식. 자동 필터 3가지: (1) NaN/Inf loss/gradient 없이 완주, (2) 중단 없이 설정 epoch까지 정상 종료, (3) reward가 batch 전체에서 0인 epoch 없음(과거 사례 A 배제). 필터 통과 후보 중 사람이 최종 5회 확정. problem.md 6절(정상 run 판별 기준 행 신설)/8절(관련 미결 질문 제거)에 반영 완료. 이제 T2-1의 임계치 통계량 산출에 필요한 baseline 수집 기준이 갖춰짐.",
+      "detail_doc": "docs/backlog/T2-2.md"
+    },
+    {
+      "id": "T2-3",
+      "status": "todo",
+      "priority": null,
+      "category": "decision",
+      "title": "알림 텍스트 파일 저장 위치/파일명/포맷 설계",
+      "summary": "디렉터리 구조, 파일명 규칙(예: 타임스탬프+epoch), 포맷(txt/json 등) 확정.",
+      "where": null,
+      "parent": "T2",
+      "deps": [],
+      "doc": "problem.md",
+      "done_when": "저장 경로·파일명 규칙·포맷 확정 및 문서화",
+      "est_min": 30,
+      "gate": null,
+      "owner": "user",
+      "claimed_at": null,
+      "updated_at": "2026-09-15T05:47:13.340Z",
+      "log": [],
+      "done_at": null,
+      "evidence": "사용자 결정: 저장 위치=logs/alerts/(저장소 루트 기준), 파일명 규칙=타임스탬프+epoch (YYYYMMDD-HHMMSS_epochNNN.txt, 예: 20260915-143022_epoch042.txt), 포맷=순수 텍스트(problem.md 6절이 이미 '텍스트 파일'로 명시해 JSON 등 다른 포맷은 검토 대상 아니었음). problem.md 6절(알림 채널 행)/8절(관련 미결 질문 제거)에 반영 완료.",
+      "detail_doc": "docs/backlog/T2-3.md"
+    },
+    {
+      "id": "T2-4",
+      "status": "todo",
+      "priority": null,
+      "category": "decision",
+      "title": "이메일 발송 설정 결정",
+      "summary": "발신 계정/서비스, 인증 방식(SMTP, 앱 비밀번호 등) 확정.",
+      "where": null,
+      "parent": "T2",
+      "deps": [],
+      "doc": "problem.md",
+      "done_when": "발신 계정·인증 방식 확정",
+      "est_min": 30,
+      "gate": null,
+      "owner": "user",
+      "claimed_at": null,
+      "updated_at": "2026-09-15T06:08:53.212Z",
+      "log": [],
+      "done_at": null,
+      "evidence": "사용자 결정: 이메일 발송 채널 자체를 취소함. 알림은 텍스트 파일(logs/alerts/)만 사용. problem.md 6절(알림 채널 행 - 이메일 제거), 7절(예시1/예시2의 기대 결과에서 이메일 제거), 8절(이메일 발송 설정 미결 질문 삭제)에 반영 완료. npm run check 통과.",
+      "detail_doc": "docs/backlog/T2-4.md"
+    },
+    {
+      "id": "T2-5",
+      "status": "done",
+      "priority": null,
+      "category": "docs",
+      "title": "Codex CLI 판단 기준 가이드라인 작성",
+      "summary": "gradient vanishing / entropy collapse / loss-reward 불일치 각각에 대해 Codex가 '이상'으로 판단할 구체적 기준 문서화. 현재는 전적으로 위임하기로만 결정되고 기준 자체는 미정의.",
+      "where": null,
+      "parent": "T2",
+      "deps": [
+        "T2-1",
+        "T2-2"
+      ],
+      "doc": "problem.md",
+      "done_when": "3개 판단 유형별 구체적 기준 문서 작성 완료",
+      "est_min": 30,
+      "gate": null,
+      "owner": null,
+      "claimed_at": null,
+      "updated_at": "2026-09-15T06:12:07.039Z",
+      "log": [
+        {
+          "at": "2026-09-15T05:54:43.002Z",
+          "from": "todo",
+          "to": "in_progress",
+          "note": "착수: T2-1/T2-2 decision 내용은 실질적으로 결정 완료(evidence/problem.md 기록됨)이나 category=decision 특성상 deps가 CLI상 done으로 안 잡혀 ready 목록엔 여전히 blocked로 표시됨 - 사용자 승인 하에 진행."
+        },
+        {
+          "at": "2026-09-15T05:56:38.569Z",
+          "from": "in_progress",
+          "to": "in_review",
+          "note": "problem.md §9로 Codex 판단 기준 초안 작성 완료(gradient vanishing/entropy collapse/loss-reward 불일치 3종). npm run check 통과. critical-reviewer 검토 대기."
+        },
+        {
+          "at": "2026-09-15T06:12:07.039Z",
+          "from": "in_review",
+          "to": "done",
+          "note": "critical-reviewer 2라운드에서 나온 Critical/High 전부 해소, Medium 7개 중 6개 해소(1개는 후속 태스크 미등록 상태로 명시적 디스클로저). npm run check 통과. deps(T2-1,T2-2)는 category=decision이라 CLI상 done 전이가 구조적으로 불가능해 todo로 남아있지만 실제 결정 내용은 problem.md/evidence에 기록되어 있음(사용자 승인 하에 진행)."
+        }
+      ],
+      "done_at": "2026-09-15T06:12:07.039Z",
+      "evidence": "critical-reviewer 2라운드 검토 완료. 1라운드: Critical 1(9.3 방향모순)+High 6+Medium 4 전부 수정. 2라운드 재검증: High 4개(9.3 정의문 잔여모순/9.2 AND-OR 미수치화/9.1 policy_loss 정체 임계치 누락/9.3 조건-절차 혼재+단위불일치) 전부 수정 완료 - 9.1 policy_loss 변동폭 2% 키 추가, 9.2를 (A AND B) 또는 C 급락조건(12epoch/80%)으로 재구성, 9.3 절차/조건/출력 분리하고 기울기x window로 단위를 표준편차와 맞춤. Medium 7개 중 6개 수정(abs_floor->abs_cap 개명, Codex 출력 JSON 포맷 고정, 중복알림 억제를 '다중 이상 동시 발생시 한 파일에 병기'로 재정의, baseline 풀링 단위 통일, §5 문구를 §9.3 참조로 수정, §6 baseline 수집 범위 확장을 '미확정 전제'로 명시적으로 격하). 1개는 완전 해소 안 됨(Codex 프롬프트 전문 설계용 후속 태스크가 아직 backlog에 미등록 - §9 서문에 그 사실을 그대로 명시해둠). npm run check 통과. 이메일 관련 내용은 T2-4 결정(이메일 취소)에 맞춰 전부 제거.",
+      "detail_doc": "docs/backlog/T2-5.md"
+    },
+    {
+      "id": "T2-6",
+      "status": "done",
+      "priority": null,
+      "category": "decision",
+      "title": "체크 주기 조절 방식 설계",
+      "summary": "실행 인자 vs 설정 파일 중 조절 방식 결정, 기본값(매 epoch) 유지 여부 확정.",
+      "where": null,
+      "parent": "T2",
+      "deps": [],
+      "doc": "problem.md",
+      "done_when": "조절 방식(인자/설정파일)과 기본값 확정",
+      "est_min": 30,
+      "gate": null,
+      "owner": "user",
+      "claimed_at": null,
+      "updated_at": "2026-09-15T06:40:37.806Z",
+      "log": [
+        {
+          "at": "2026-09-15T06:40:37.806Z",
+          "from": "todo",
+          "to": "done",
+          "note": "[user-confirmed: decision category, done via explicit override] 체크 주기 조절 방식 = config.yaml 설정 파일. 대화 중 AskUserQuestion으로 명시적으로 확인된 사용자 결정."
+        }
+      ],
+      "done_at": "2026-09-15T06:40:37.806Z",
+      "evidence": "사용자 결정: 조절 방식=설정 파일(config.yaml, 저장소 루트), CLI 실행 인자 방식 아님. 이 파일은 향후 T2-1(gradient explosion 임계치)/T2-3(알림 파일 경로·포맷)/T2-4(이메일 설정) 결정값도 함께 담는 공용 설정 파일로 쓰기로 함(각 항목의 정확한 키 이름은 해당 결정 시점에 정함). 기본값(매 epoch)은 problem.md 6절에 이미 결정되어 있던 값 그대로 유지. problem.md 6절/8절에 반영 완료(체크 주기 행 갱신, 관련 미결 질문 제거).",
+      "detail_doc": "docs/backlog/T2-6.md"
+    },
+    {
+      "id": "T2-7",
+      "status": "in_review",
+      "priority": null,
+      "category": "test",
+      "title": "기존 entropy/reward 로그 포맷 확인",
+      "summary": "실제 로그 파일이 저장소에 없어(설계 단계) 대신 로그 포맷을 직접 설계하고 가상 샘플 데이터로 파싱 가능 여부를 검증(사용자 지시로 방향 전환).",
+      "where": null,
+      "parent": "T2",
+      "deps": [],
+      "doc": "problem.md",
+      "done_when": "로그 샘플 확인 및 파싱 가능 여부 결론 문서화",
+      "est_min": 30,
+      "gate": null,
+      "owner": null,
+      "claimed_at": null,
+      "updated_at": "2026-09-15T06:31:20.716Z",
+      "log": [
+        {
+          "at": "2026-09-15T05:11:40.764Z",
+          "from": "todo",
+          "to": "in_progress",
+          "note": "착수: fork로 병렬 구현 시작"
+        },
+        {
+          "at": "2026-09-15T05:12:49.532Z",
+          "from": "in_progress",
+          "to": "needs_info",
+          "note": "실제 entropy/reward 로그 파일이 저장소 내 어디에도 없음(RL 학습은 별도 환경에서 실행). 로그 파일 경로/샘플을 알려주면 포맷 확인 가능."
+        },
+        {
+          "at": "2026-09-15T06:31:09.159Z",
+          "from": "needs_info",
+          "to": "in_progress",
+          "note": "사용자 지시로 방향 전환: 가상 데이터로 포맷 설계·검증 재착수"
+        },
+        {
+          "at": "2026-09-15T06:31:20.716Z",
+          "from": "in_progress",
+          "to": "in_review",
+          "note": "포맷 설계 + 가상 샘플(logs/samples/epoch_log_sample.csv) + 파싱 검증 스크립트 실행 완료, problem.md 반영. critical-reviewer 검토 대기."
+        }
+      ],
+      "done_at": null,
+      "evidence": "실제 로그 파일 없음 확인 후, 사용자 지시로 방향 전환: 포맷을 직접 설계(CSV, 헤더 epoch,entropy,reward,policy_loss,gradient_norm - §6 로깅 지표를 그대로 컬럼화), logs/samples/epoch_log_sample.csv에 정상 run 20epoch 가상 데이터 생성(entropy 1.10→0.67 완만 감소, reward -2.3→20.4 상승, gradient_norm 11~14 안정 - §7 예시3 스케일에 맞춤). Node 스크립트로 20행 전부 컬럼수 일치·전 필드 숫자 파싱 성공을 직접 실행해 확인(파싱 가능 결론 확보). problem.md 8절/8-1절에 포맷 설계와 검증 결과 반영. npm run check 통과.",
+      "detail_doc": "docs/backlog/T2-7.md"
+    }
+  ]
+}
